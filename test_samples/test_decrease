@@ -1,0 +1,4 @@
+.vars
+a=10
+.expression
+a-1

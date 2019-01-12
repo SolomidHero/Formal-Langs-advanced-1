@@ -1,0 +1,4 @@
+.vars
+a=101
+.expression
+inc(dec(a))

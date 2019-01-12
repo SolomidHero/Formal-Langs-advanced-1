@@ -69,6 +69,8 @@ enum NumberValue : char {
 
 TokenValue last_operation_token = NUMBER;
 int number_value;                         //  last number value
+constexpr int max_arm_asm_bits = 12;
+constexpr int pointer_size = 4;
 std::string string_value;                 //  last string value
 std::map<std::string, int*> table;        //  names table
 std::vector<uint> result;                 //  asm codes
@@ -134,10 +136,10 @@ void atom(std::istream* input, bool get) {
     case NUMBER: {
       int v = number_value;
       get_token(input);
-      if ((v >> 12) == 0) {
+      if ((v >> max_arm_asm_bits) == 0) {
         result.push_back(mov_r3_value + v);   //  mov r3, #num
       } else {
-        result.push_back(ldr_r3_num);       //  mov r3, .num, num declared later
+        result.push_back(ldr_r3_num);         //  mov r3, .num, num declared later
         big_numbers.push_back(std::make_pair(result.size(), v));
       }
       return;
@@ -156,13 +158,13 @@ void atom(std::istream* input, bool get) {
           result.push_back(str_r3_sp);    //  str r3, [sp]
         } while (last_operation_token == COM);
         for (int i = 0; i < func_args; ++i) {
-          result.push_back(ldr_r0_sp + (i << 12) + 4*(func_args - 1 - i));
+          result.push_back(ldr_r0_sp + (i << max_arm_asm_bits) + pointer_size * (func_args - 1 - i));
         }
         result.push_back(ldr_r4_func);    //  ldr r4, .func_ptr
         function_ptrs.push_back(std::make_pair(result.size(), func_name));
         result.push_back(blx_r4);         //  blx r4
         result.push_back(mov_r3_r0);      //  mov r3, r0
-        result.push_back(add_sp_0 + func_args * 4); // add sp, #4*fargc
+        result.push_back(add_sp_0 + func_args * pointer_size); // add sp, #4*fargc
         get_token(input);
       } else {
         int v = *table[string_value];
@@ -179,8 +181,8 @@ void atom(std::istream* input, bool get) {
     case MINUS: {
       atom(input, true);
       result.push_back(mov_r2_neg1);   //  mov r2, #-1
-      result.push_back(eor_r3_r2);   //  eor r3, r2
-      result.push_back(add_r3_1);   //  add r3, r3, #1
+      result.push_back(eor_r3_r2);     //  eor r3, r2
+      result.push_back(add_r3_1);      //  add r3, r3, #1
       return;
     }
     default:
@@ -189,9 +191,9 @@ void atom(std::istream* input, bool get) {
 }
 
 void term(std::istream* input, bool get) {
-  result.push_back(sub_sp_4);   //  sub sp, sp, #4
+  result.push_back(sub_sp_4);          //  sub sp, sp, #4
   atom(input, get);
-  result.push_back(str_r3_sp);   //  str r3, [sp]
+  result.push_back(str_r3_sp);         //  str r3, [sp]
 
   while (true) {
     switch (last_operation_token) {
@@ -203,16 +205,16 @@ void term(std::istream* input, bool get) {
         break;
       default:
         result.push_back(ldr_r3_sp);   //  ldr r3, [sp]
-        result.push_back(add_sp_4);   //  add sp, sp, #4
+        result.push_back(add_sp_4);    //  add sp, sp, #4
         return;
     }
   }
 }
 
 void expr(std::istream* input, bool get) {
-  result.push_back(sub_sp_4);   //  sub sp, sp, #4
+  result.push_back(sub_sp_4);          //  sub sp, sp, #4
   term(input, get);
-  result.push_back(str_r3_sp);   //  str r3, [sp]
+  result.push_back(str_r3_sp);         //  str r3, [sp]
 
   while (true) {
     switch (last_operation_token) {
@@ -230,7 +232,7 @@ void expr(std::istream* input, bool get) {
         break;
       default:
         result.push_back(ldr_r3_sp);   //  ldr r3, [sp]
-        result.push_back(add_sp_4);   //  add sp, sp, #4
+        result.push_back(add_sp_4);    //  add sp, sp, #4
         return;
     }
   }
@@ -238,8 +240,8 @@ void expr(std::istream* input, bool get) {
 
 extern "C" void
 jit_compile_expression_to_arm(const char* expression, const symbol_t* externs, void* out_buffer) {
-  result.push_back(push_r4);   //  push {r4}, same as str r4, [sp, #-4]!
-  result.push_back(sub_sp_4);   //  sub sp, sp, #4
+  result.push_back(push_r4);        //  push {r4}, same as str r4, [sp, #-4]!
+  result.push_back(sub_sp_4);       //  sub sp, sp, #4
   const symbol_t* data = externs;
   int it = 0;
   while (data[it].name != NULL) {
@@ -249,7 +251,7 @@ jit_compile_expression_to_arm(const char* expression, const symbol_t* externs, v
   }
   std::string s (expression);
   std::istringstream istr(s);
-  std::istream* input = &istr; // stream pointer
+  std::istream* input = &istr;      // stream pointer
   while (*input) {
     get_token(input);
     if (last_operation_token == END) {
@@ -258,21 +260,21 @@ jit_compile_expression_to_arm(const char* expression, const symbol_t* externs, v
     expr(input, false);
   }
 
-  result.push_back(mov_r0_r3);     //  mov r0, r3
-  result.push_back(add_sp_4);     //  add sp, sp, #4
-  result.push_back(pop_lr);     //  pop  {lr}, same as ldr [sp], #4
-  result.push_back(bx_lr);     //  bx  lr
+  result.push_back(mov_r0_r3);      //  mov r0, r3
+  result.push_back(add_sp_4);       //  add sp, sp, #4
+  result.push_back(pop_lr);         //  pop  {lr}, same as ldr [sp], #4
+  result.push_back(bx_lr);          //  bx  lr
 
   //  execute functions
-  for (int i = 0; i < function_ptrs.size(); ++i) {
-    result.push_back((int)table[function_ptrs[i].second]); //  function ptr
-    result[function_ptrs[i].first - 1] += (result.size() - function_ptrs[i].first - 2)*4;
+  for (auto& [index, ptr] : function_ptrs) {
+    result.push_back((int)table[ptr]); //  function ptr
+    result[index - 1] += (result.size() - index - 2) * 4;
   }
 
   //  set big numbers
-  for (int i = 0; i < big_numbers.size(); i++) {
-    result.push_back(big_numbers[i].second);    //  number
-    result[big_numbers[i].first - 1] += (result.size() - big_numbers[i].first - 2)*4;   //  address offset
+  for (auto& [index, ptr] : big_numbers) {
+    result.push_back(ptr);    //  number
+    result[index - 1] += (result.size() - index - 2) * 4;   //  address offset
   }
 
   uint *res_buff = (uint*)out_buffer;

@@ -35,7 +35,17 @@ Build and launch:
 // arm-linux-gnueabi-g++ and arm-linux-gnueabi-gcc
 // arm sysroot library must be located at ~/arm-sysroot
 make
-./program
+qemu-arm -L [path_to_arm_sysroot] ./program
+
+// also you can execute by make
+make launch
+```
+
+Tests:
+```
+// compile and link for test
+make test
+make launch_test
 ```
 
 ## Example

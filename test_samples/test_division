@@ -1,0 +1,4 @@
+.vars
+a=74 b=5
+.expression
+div(a, b)
