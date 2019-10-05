@@ -15,15 +15,17 @@ extern void
 jit_compile_expression_to_arm(const char * expression, const symbol_t * externs, void * out_buffer);
 ```
 
-expression - string of arithmetic expression
-symbol_t - struct describes global variables and functions
-out_buffer - pointer to the block of executable code
+<i>expression</i> - string of arithmetic expression
 
-Input:
-Definitions of variables in .vars segment
-Arithmetic expression in .expression segment
+<i>symbol_t</i> - struct describes global variables and functions
 
-Output:
+<i>out_buffer</i> - pointer to the block of executable code
+
+<b>Input</b>:
+Definitions of variables in .vars segment and
+arithmetic expression in .expression segment
+
+<b>Output</b>:
 Value of expression
 
 ## Details
